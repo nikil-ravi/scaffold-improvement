@@ -1,66 +1,97 @@
 import argparse
-from typing import Dict, List
-import os
-import subprocess
-from .utils import setup_docker, apply_patch, safe_log
 import json
+import os
+import tempfile
+from typing import Dict, List
+
+from swebench.harness.run_evaluation import main as run_harness
+try:  # support running as a script
+    from .utils import safe_log
+except ImportError:  # pragma: no cover
+    from utils import safe_log
+
 
 def run_swe_eval(
     patch_path: str,
     model_name: str,
     subset: str = "small",
-    num_evals: int = 1,
-    max_workers: int = 5
+    num_evals: int = 10,
+    max_workers: int = 5,
 ) -> Dict:
-    """Simulate SWE-bench evaluation for a given patch."""
-    # Mock task list (replace with real SWE-bench tasks if available)
-    tasks = ["django__django-10973", "django__django-11066"]  # Placeholder task IDs
+    """Run the official SWE-bench evaluation harness for a patch.
 
-    container = setup_docker()
-    try:
-        # Attempt to apply patch
-        try:
-            apply_patch(container, patch_path)
-            patch_applied = True
-        except subprocess.CalledProcessError:
-            patch_applied = False
-            safe_log(f"Failed to apply patch: {patch_path}")
+    Parameters
+    ----------
+    patch_path: str
+        Path to a Git patch file.
+    model_name: str
+        Identifier for the current model/run.
+    subset: str
+        Name of JSON file listing instance IDs (e.g., "small").
+    num_evals: int
+        Number of instances from the subset to evaluate.
+    max_workers: int
+        Number of parallel workers for the harness.
+    """
 
-        # Simulate evaluation results
-        results = {}
-        for task in tasks:
-            # Mock result: assume patch application success means tests pass
-            results[task] = {
-                "patch_is_None": False,
-                "patch_exists": os.path.exists(patch_path),
-                "patch_successfully_applied": patch_applied,
-                "resolved": patch_applied,  # Simulate success if patch applies
-                "tests_status": {
-                    "FAIL_TO_PASS": {"success": [f"test_{task}"] if patch_applied else [], "failure": []},
-                    "PASS_TO_PASS": {"success": [], "failure": []},
-                    "FAIL_TO_FAIL": {"success": [], "failure": []},
-                    "PASS_TO_FAIL": {"success": [], "failure": []}
-                }
-            }
+    with open(patch_path, "r", encoding="utf-8") as f:
+        patch = f.read()
 
-        # Save results to output directory
-        output_dir = os.path.join("output", model_name)
-        os.makedirs(output_dir, exist_ok=True)
-        with open(os.path.join(output_dir, f"{model_name}_report.json"), "w") as f:
-            json.dump(results, f, indent=2)
+    subset_file = subset if subset.endswith(".json") else f"{subset}.json"
+    with open(subset_file, "r", encoding="utf-8") as f:
+        all_tasks: List[str] = json.load(f)
+    tasks = all_tasks[:num_evals]
 
-        return results
+    predictions = [
+        {
+            "instance_id": t,
+            "model_name_or_path": model_name,
+            "model_patch": patch,
+        }
+        for t in tasks
+    ]
+    tmp_preds = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8")
+    json.dump(predictions, tmp_preds)
+    tmp_preds.close()
 
-    finally:
-        container.stop()
-        container.remove()
+    output_dir = os.path.join("output", model_name)
+    os.makedirs(output_dir, exist_ok=True)
+
+    report_path = run_harness(
+        dataset_name="SWE-bench/SWE-bench",
+        split="test",
+        instance_ids=tasks,
+        predictions_path=tmp_preds.name,
+        max_workers=max_workers,
+        force_rebuild=False,
+        cache_level="none",
+        clean=False,
+        open_file_limit=4096,
+        run_id=model_name,
+        timeout=7200,
+        namespace=None,
+        rewrite_reports=False,
+        modal=False,
+        instance_image_tag="latest",
+        report_dir=output_dir,
+    )
+
+    with open(report_path, "r", encoding="utf-8") as f:
+        results: Dict = json.load(f)
+    return results
+
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Simulate SWE-bench evaluation.")
+    parser = argparse.ArgumentParser(description="Run SWE-bench evaluation")
     parser.add_argument("--patch_path", required=True, help="Path to patch file")
     parser.add_argument("--model_name", required=True, help="Model name for run")
-    parser.add_argument("--subset", default="small", choices=["small", "medium", "big"], help="SWE-bench subset")
-    parser.add_argument("--num_evals", type=int, default=1, help="Number of evaluations")
+    parser.add_argument(
+        "--subset",
+        default="small",
+        choices=["small", "medium", "big"],
+        help="SWE-bench subset to evaluate",
+    )
+    parser.add_argument("--num_evals", type=int, default=10, help="Number of evaluations")
     parser.add_argument("--max_workers", type=int, default=5, help="Max parallel workers")
     args = parser.parse_args()
 
@@ -69,6 +100,6 @@ if __name__ == "__main__":
         args.model_name,
         args.subset,
         args.num_evals,
-        args.max_workers
+        args.max_workers,
     )
     safe_log(json.dumps(results, indent=2))

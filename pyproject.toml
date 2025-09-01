@@ -11,6 +11,5 @@ dependencies = [
   "gitpython",
   "openai",
   "datasets",
-  # uncomment if you want real SWE-bench harness inside the image
-  # "swebench",
+  "swebench",
 ]

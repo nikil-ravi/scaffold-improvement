@@ -1,5 +1,4 @@
 import argparse
-from typing import Optional
 from .utils import setup_docker, apply_patch, get_logs
 from .agent import Agent
 from .evaluate import run_swe_eval
@@ -28,7 +27,7 @@ def self_improve(entry: str, model: str) -> None:
     os.makedirs("output/baseline", exist_ok=True)
     with open("current_patch.diff", "w") as f:
         f.write("")  # Empty initial patch for baseline
-    eval_results = run_swe_eval("current_patch.diff", "baseline")
+    eval_results = run_swe_eval("current_patch.diff", "baseline", num_evals=10)
     logs = get_logs(eval_results)
 
     print("Logs: ", logs)
@@ -59,7 +58,7 @@ def self_improve(entry: str, model: str) -> None:
     container.remove()
 
     # Step 4: Re-eval
-    new_results = run_swe_eval("new_patch.diff", "improved")
+    new_results = run_swe_eval("new_patch.diff", "improved", num_evals=10)
     print(json.dumps(new_results, indent=2))
 
 
