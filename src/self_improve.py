@@ -7,6 +7,18 @@ from prompts.improve import DIAGNOSE_PROMPT, IMPROVE_PROMPT
 import os
 import json
 
+def validate_patch(patch_content: str) -> bool:
+    """Validate that a patch has proper format and context."""
+    if not patch_content.strip():
+        return False
+    lines = patch_content.split('\n')
+    has_diff_header = any(line.startswith('diff --git') for line in lines)
+    has_hunk = any(line.startswith('@@') for line in lines)
+    has_file_markers = any(line.startswith('---') for line in lines) and \
+                       any(line.startswith('+++') for line in lines)
+    return has_diff_header and has_hunk and has_file_markers
+
+
 
 def self_improve(entry: str, model: str) -> None:
     """Perform self-improvement on a SWE-bench entry."""
@@ -28,6 +40,13 @@ def self_improve(entry: str, model: str) -> None:
     # Step 3: Improve
     improve_prompt = IMPROVE_PROMPT.format(problem=problem)
     new_code = agent.chat(improve_prompt)  # Assume outputs patch
+    
+    # Validate patch format before saving
+    if not validate_patch(new_code):
+        print("Warning: Generated patch failed validation. Attempting to continue...")
+        # Log the invalid patch for debugging
+        with open("invalid_patch.diff", "w") as f:
+            f.write(new_code)
 
     # Save new patch
     with open("new_patch.diff", "w") as f:

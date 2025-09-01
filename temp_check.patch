@@ -1,0 +1,25 @@
+diff --git a/django/db/backends/sqlite3/introspection.py b/django/db/backends/sqlite3/introspection.py
+index 4c0e1d6e5f..1e2c5e0a1f 100644
+--- a/django/db/backends/sqlite3/introspection.py
++++ b/django/db/backends/sqlite3/introspection.py
+@@ -54,7 +54,7 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
+         'real': 'FloatField',
+         'text': 'TextField',
+         'char': 'CharField',
+-        'varchar': 'CharField',
++        'varchar': 'TextField',
+         'blob': 'BinaryField',
+         'date': 'DateField',
+         'datetime': 'DateTimeField',
+@@ -205,7 +205,10 @@ class DatabaseIntrospection(BaseDatabaseIntrospection):
+             # declared type matches in order from least to most common. Calling
+             # re.search() for each declared type only performs the search once
+             # and then the resulting match object is cached for later use.
+-            column = result[0]
++            column_type = result[0]
++            # Check if varchar has a length specified (e.g., varchar(100))
++            if column_type and column_type.lower().startswith('varchar('):
++                return 'CharField'
+             try:
+                 field_type = self.data_types_reverse[column]
+             except KeyError:
