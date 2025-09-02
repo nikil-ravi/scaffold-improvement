@@ -1,22 +1,22 @@
 # Self-Improver Agent Benchmark
 A simple repo for LLM-based self-improvement of code agents, evaluated on SWE-bench.
 ## Setup
+Requires **Python 3.10+**.
 Set env vars: `export ANTHROPIC_API_KEY=...` or `OPENAI_API_KEY=...`.
 Build Docker: `docker build -t self-improve-agent .`.
 Run container: `docker run -it -v $(pwd):/app self-improve-agent`.
 ## Usage
 Self-improve and eval: `python src/self_improve.py --entry django__django-XXXX --model claude-3-5-sonnet-20240620`.
 Eval only: `python src/evaluate.py --patch_path model_patch.diff --model_name test_model`.
-Uses SWE-bench subsets (small/medium/big) for eval.
+Uses SWE-bench subsets (small/medium/big) for evaluation with the official harness.
 
 
 # The full pipeline involves:
 1. Baseline Evaluation (run_swe_eval in src/evaluate.py):
 
-- Creates an empty current_patch.diff to simulate a baseline.
-- Uses a Docker container (self-improve-agent image) to apply the patch.
-- Simulates SWE-bench evaluation for placeholder tasks (e.g., django__django-10973, django__django-11066).
-- Returns mock results (e.g., resolved: False for empty patches) saved in output/baseline/<model_name>_report.json.
+- Creates an empty `current_patch.diff` for the baseline run.
+- Invokes the SWE-bench evaluation harness on the first 10 instances listed in `small.json` (or other subset files).
+- Produces a real evaluation report saved under `output/<model_name>/`.
 
 
 2. Diagnosis (Agent.chat in src/agent.py):
@@ -33,6 +33,5 @@ Uses SWE-bench subsets (small/medium/big) for eval.
 
 4. Re-evaluation (run_swe_eval in src/evaluate.py):
 
-- Applies the new patch in a Docker container.
-- Re-runs the mock evaluation, producing results (e.g., resolved: True if the patch applies cleanly).
-- Saves results to output/improved/<model_name>_report.json and logs them.
+- Runs the harness again with the generated patch on the same SWE-bench instances.
+- Saves results to `output/<model_name>/` and logs them.
