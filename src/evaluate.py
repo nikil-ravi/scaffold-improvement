@@ -26,7 +26,7 @@ def run_swe_eval(
     max_workers: int = 5,
 ) -> Dict:
     """Run the official SWE-bench evaluation harness for a patch.
-
+    
     Parameters
     ----------
     patch_path: str
