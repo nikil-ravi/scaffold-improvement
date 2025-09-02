@@ -1,6 +1,7 @@
 # Self-Improver Agent Benchmark
 A simple repo for LLM-based self-improvement of code agents, evaluated on SWE-bench.
 ## Setup
+Requires **Python 3.10+**.
 Set env vars: `export ANTHROPIC_API_KEY=...` or `OPENAI_API_KEY=...`.
 Build Docker: `docker build -t self-improve-agent .`.
 Run container: `docker run -it -v $(pwd):/app self-improve-agent`.

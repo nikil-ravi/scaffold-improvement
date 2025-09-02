@@ -1,8 +1,15 @@
 import argparse
 import json
 import os
+import sys
 import tempfile
 from typing import Dict, List
+
+if sys.version_info < (3, 10):  # pragma: no cover
+    raise RuntimeError(
+        "The SWE-bench harness requires Python 3.10 or newer; "
+        f"current version: {sys.version_info.major}.{sys.version_info.minor}"
+    )
 
 from swebench.harness.run_evaluation import main as run_harness
 try:  # support running as a script
@@ -19,7 +26,7 @@ def run_swe_eval(
     max_workers: int = 5,
 ) -> Dict:
     """Run the official SWE-bench evaluation harness for a patch.
-
+    
     Parameters
     ----------
     patch_path: str
